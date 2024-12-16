@@ -1,0 +1,29 @@
+<!-- category_detail.html -->
+{% extends "base.html" %}
+{% block content %}
+<header class="bg-dark py-5">
+    <div class="container px-4 px-lg-5 my-5">
+        <div class="text-center text-white">
+            <h1 class="display-4 fw-bolder">{{ category.name }}</h1>
+            <p class="lead fw-normal text-white-50 mb-0">{{ category.description }}</p>
+        </div>
+    </div>
+</header>
+
+<div class="container" style="max-width: 600px; padding: 10px;">
+    {% if products %}
+        <ul class="list-group">
+            {% for product in products %}
+                <li class="list-group-item">
+                    <h5>{{ product.name }}</h5>
+                    <p>{{ product.description }}</p>
+                    <span>${{ product.price }}</span>
+                    <a href="{% url 'product_detail' product.id %}" class="btn btn-secondary btn-sm">View Product</a>
+                </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p>No products available in this category.</p>
+    {% endif %}
+</div>
+{% endblock %}

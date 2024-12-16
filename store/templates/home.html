@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+
+{% block content %}
+    <!-- Header -->
+    <header class="bg-dark py-4">
+        <div class="container px-4 px-lg-5 my-4">
+            <div class="text-center text-white">
+                <h1 class="display-5 fw-bold">Shop in style</h1>
+                <p class="lead fw-normal text-white-50 mb-0">With QuickCart</p>
+            </div>
+        </div>
+    </header>
+
+    <!-- Popular Products Carousel -->
+    <section class="carousel slide mb-5" id="popularProductsCarousel" data-bs-ride="carousel">
+        <div class="carousel-inner">
+            {% for product in popular_products %}
+            <div class="carousel-item {% if forloop.first %}active{% endif %}">
+                <div class="d-flex justify-content-center align-items-center" style="height: 400px;">
+                    <img src="{{ product.image.url }}" class="d-block w-50" alt="{{ product.name }}">
+                    <div class="carousel-caption d-none d-md-block">
+                        <h5>{{ product.name }}</h5>
+                        <p>{{ product.description|truncatewords:15 }}</p>
+                        <p><strong>${{ product.price }}</strong></p>
+                        <!-- Display product rating as stars -->
+                        <p>
+                            {% for i in "12345" %}
+                                {% if i|add:"0" <= product.avg_rating|default:0 %}
+                                    <span class="fa fa-star checked"></span>
+                                {% else %}
+                                    <span class="fa fa-star"></span>
+                                {% endif %}
+                            {% endfor %}
+                        </p>
+                        <a class="btn btn-primary" href="{% url 'product' product.id %}">View Product</a>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        <button class="carousel-control-prev" type="button" data-bs-target="#popularProductsCarousel" data-bs-slide="prev">
+            <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+            <span class="visually-hidden">Previous</span>
+        </button>
+        <button class="carousel-control-next" type="button" data-bs-target="#popularProductsCarousel" data-bs-slide="next">
+            <span class="carousel-control-next-icon" aria-hidden="true"></span>
+            <span class="visually-hidden">Next</span>
+        </button>
+    </section>
+
+    <!-- All Products Section -->
+    <section class="py-5">
+        <div class="container px-4 px-lg-5 mt-5">
+            <div class="row gx-4 gx-lg-5 row-cols-2 row-cols-md-3 row-cols-xl-4 justify-content-center">
+                {% for product in products %}
+                <div class="col mb-5">
+                    <div class="card h-100">
+                        {% if product.is_sale %}
+                        <div class="badge bg-dark text-white position-absolute" style="top: 0.5rem; right: 0.5rem">Sale</div>
+                        {% endif %}
+                        <img class="card-img-top" src="{{ product.image.url }}" alt="{{ product.name }}" />
+                        <div class="card-body p-4">
+                            <div class="text-center">
+                                <h5 class="fw-bolder">{{ product.name }}</h5>
+                                {% if product.is_sale %}
+                                <strike>${{ product.price }}</strike> ${{ product.sale_price }}
+                                {% else %}
+                                ${{ product.price }}
+                                {% endif %}
+                                <p>{{ product.description|truncatewords:10 }}</p>
+                                <!-- Display product rating as stars -->
+                                <p>
+                                    {% for i in "12345" %}
+                                        {% if i|add:"0" <= product.avg_rating|default:0 %}
+                                            <span class="fa fa-star checked"></span>
+                                        {% else %}
+                                            <span class="fa fa-star"></span>
+                                        {% endif %}
+                                    {% endfor %}
+                                </p>
+                            </div>
+                        </div>
+                        <div class="card-footer p-4 pt-0 border-top-0 bg-transparent">
+                            <div class="text-center">
+                                <a class="btn btn-outline-dark mt-auto" href="{% url 'product' product.id %}">View Product</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </section>
+{% endblock content %}

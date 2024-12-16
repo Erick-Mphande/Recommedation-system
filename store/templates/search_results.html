@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+
+{% block content %}
+{% load custom_filters %}
+
+<h5>Search Results </h5>
+
+<div class="search-results">
+    {% if results %}
+        <ul class="product-list">
+            {% for product in results %}
+                <li class="product-item">
+                    <a href="{% url 'product_detail' product.id %}">
+                        <img src="{{ product.image.url }}" alt="{{ product.name }}" class="product-image">
+                        <strong>{{ product.name }}</strong><br/>
+                        {{ product.description }}
+                    </a>
+                    <p class="product-price">${{ product.price }}</p>
+                </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p>No results found "{{ query }}"</p>
+    {% endif %}
+</div>
+
+<!--<h5>You might also like...</h5>-->
+<div class="container" style="max-width: 600px; padding: 10px; margin-top: 20px;">
+    <div class="row">
+       {% for recommendation in personalized_recommendations %}
+    {% if recommendation.id %}
+        <div class="col-md-4 mb-3">
+            <div class="card">
+                <img src="{{ recommendation.image.url }}" class="card-img-top" alt="{{ recommendation.name }}">
+                <div class="card-body">
+                    <h6 class="card-title">{{ recommendation.name }}</h6>
+                    {% if recommendation.is_sale %}
+                        <strike style="font-size: 0.9rem;">${{ recommendation.price }}</strike><br/>
+                        <span style="font-size: 1.1rem;">${{ recommendation.sale_price }}</span>
+                    {% else %}
+                        <span style="font-size: 1.1rem;">${{ recommendation.price }}</span>
+                    {% endif %}
+                    <a href="{% url 'view_product' recommendation.id %}" class="btn btn-primary btn-sm">View</a>
+                </div>
+            </div>
+        </div>
+    {% endif %}
+{% empty %}
+  <!-- <p>No recommendations available at the moment.</p> -->
+{% endfor %}
+
+    </div>
+</div>
+
+<style>
+    .product-list {
+        display: flex;
+        flex-wrap: wrap;
+        list-style-type: none;
+        padding: 0;
+        margin: 0;
+    }
+    .product-item {
+        width: 200px;
+        margin: 10px;
+        text-align: center;
+        border: 1px solid #ccc;
+        padding: 10px;
+    }
+    .product-image {
+        max-width: 100%;
+        height: auto;
+    }
+    .product-price {
+        font-weight: bold;
+    }
+</style>
+
+{% endblock %}

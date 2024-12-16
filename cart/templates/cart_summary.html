@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+
+{% block content %}
+<header class="bg-dark py-5">
+    <div class="container px-4 px-lg-5 my-5">
+        <div class="text-center text-white">
+            <h1 class="display-4 fw-bolder">Shopping Cart</h1>
+            <p class="lead fw-normal text-white-50 mb-0">View Your Cart</p>
+        </div>
+    </div>
+</header>
+
+<div class="container" style="max-width: 600px; padding: 10px;">
+    {% if cart_products %}
+        {% for product in cart_products %}
+            <div class="card mb-3">
+                <div class="row g-0">
+                    <div class="col-md-4">
+                        <img src="{{ product.product.image.url }}" class="img-fluid rounded-start" alt="{{ product.product.name }}" style="max-height: 150px;">
+                    </div>
+                    <div class="col-md-8">
+                        <div class="card-body" style="padding: 10px;">
+                            <center>
+                                <h5 class="card-title">{{ product.product.name }}</h5>
+                                <p class="card-text">{{ product.product.description }}</p>
+
+                                {% if product.product.is_sale %}
+                                    <strike>${{ product.product.price }}</strike>
+                                    <span>${{ product.product.sale_price }}</span>
+                                {% else %}
+                                    <span>${{ product.product.price }}</span>
+                                {% endif %}
+
+                                <br/><br/>
+                                <button type="button" value="{{ product.product.id }}" class="btn btn-danger btn-sm remove-cart-btn">
+                                    Remove from Cart
+                                </button>
+            
+                            </center>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        {% endfor %}
+        <strong>Total: ${{ cart.get_total_price }}</strong>
+        <div class="text-center">
+            <a href="{% url 'checkout' %}" class="btn btn-primary mt-3">Proceed to Checkout</a>
+           
+            <hr>
+        </div>
+        <div class="text-center">
+         <a class="btn btn-outline-dark" href="{% url 'home' %}">&#x2190; Continue Shopping...</a>
+            <hr>
+        </div>
+
+    {% else %}
+        <p>There is nothing in your cart...</p>
+    {% endif %}
+</div>
+
+<!-- Include jQuery -->
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+<!-- Include SweetAlert2 for alerts -->
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+<script>
+$(document).on('click', '.remove-cart-btn', function(e) {
+    e.preventDefault();
+    var productId = $(this).val();
+
+    if (!productId) {
+        console.error("Product ID is missing!");
+        return;
+    }
+
+    Swal.fire({
+        title: 'Are you sure?',
+        text: "You will not be able to recover this item!",
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#d33',
+        cancelButtonColor: '#3085d6',
+        confirmButtonText: 'Yes, remove it!'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            $.ajax({
+                type: 'POST',
+                url: '{% url "cart_delete" %}',
+                data: {
+                    product_id: productId,
+                    csrfmiddlewaretoken: '{{ csrf_token }}',
+                    action: 'delete'
+                },
+                success: function(json) {
+                    Swal.fire(
+                        'Removed!',
+                        'The item has been removed from your cart.',
+                        'success'
+                    ).then(() => {
+                        location.reload();
+                    });
+                },
+                error: function(xhr, errmsg, err) {
+                    console.log("Error occurred:", xhr.status + ": " + xhr.responseText);
+                }
+            });
+        }
+    });
+});
+</script>
+{% endblock %}

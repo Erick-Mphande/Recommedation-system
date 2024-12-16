@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container" style="max-width: 600px; padding: 10px;">
+    <div class="card mb-3" id="product-card-{{ product.id }}">
+        <div class="row g-0">
+            <div class="col-md-4">
+                <img src="{{ product.image.url }}" class="img-fluid rounded-start" alt="{{ product.name }}" style="max-height: 150px;">
+            </div>
+            <div class="col-md-8">
+                <div class="card-body" style="padding: 10px;">
+                    <center>
+                        <h5 class="card-title" style="font-size: 1.2rem;">{{ product.name }}</h5>
+                        <p class="card-text" style="font-size: 0.9rem;">{{ product.description }}</p>
+
+                        {% if product.is_sale %}
+                        <div class="col mb-3">
+                            <div class="card-body p-2">
+                                <div class="d-flex justify-content-center small text-warning mb-1">
+                                    <div class="bi-star-fill"></div>&nbsp;&nbsp;Sale!&nbsp;&nbsp;
+                                    <div class="bi-star-fill"></div>
+                                </div>
+                                <strike style="font-size: 0.9rem;">${{ product.price }}</strike><br/>
+                                <span style="font-size: 1.1rem;">${{ product.sale_price }}</span>
+                            </div>
+                        </div>
+                        {% else %}
+                        <span style="font-size: 1.1rem;">${{ product.price }}</span>
+                        {% endif %}
+                        <br/><br/>
+
+                        <div class="row justify-content-center">
+                            <div class="col-md-4">Quantity:</div>
+                            <div class="col-md-4">
+                                <select class="form-select form-select-sm" id="qty-cart-{{ product.id }}">
+                                    {% for i in "12345"|make_list %}
+                                        <option value="{{ i }}">{{ i }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <a href="{% url 'home' %}" class="btn btn-secondary btn-sm">Home</a>
+                        <button type="button" value="{{ product.id }}" class="btn btn-secondary btn-sm add-cart-btn">Add To Cart</button>
+                        <span class="cart-status" id="cart-status-{{ product.id }}" style="display:none; color: green;">Added to Cart</span>
+
+                         <br/><br/>
+                         
+                        <a href="{% url 'product_rating' product.id|default:'0' %}" class="btn btn-primary btn-sm">Rate this Product</a>
+
+                    </center>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Include jQuery -->
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+<!-- Include SweetAlert2 for alerts -->
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+<script>
+$(document).on('click', '.add-cart-btn', function(e){
+    e.preventDefault();
+    console.log('Add to cart button clicked');
+
+    const productId = $(this).val();
+    const productQty = $('#qty-cart-' + productId).val();
+
+    console.log({
+        product_id: productId,
+        product_qty: productQty,
+        csrfmiddlewaretoken: '{{ csrf_token }}',
+        action: 'post'
+    });
+
+    $.ajax({
+        type: 'POST',
+        url: '{% url "cart_add" %}',
+        data: {
+            product_id: productId,
+            product_qty: productQty,
+            csrfmiddlewaretoken: '{{ csrf_token }}',
+            action: 'post'
+        },
+        success: function(json){
+            console.log("Success response:", json);
+            // Update cart quantity displayed in a global cart quantity element
+            document.getElementById("cart_quantity").textContent = json.qty;  
+
+            // Update the cart status on the product card
+            const cartStatusElement = document.getElementById("cart-status-" + productId);
+            cartStatusElement.style.display = 'inline';  // Show the "Added to Cart" message
+            setTimeout(function() {
+                cartStatusElement.style.display = 'none';  // Hide it after 3 seconds
+            }, 3000);
+
+            // Show success message
+            Swal.fire({
+                icon: 'success',
+                title: 'Added to Cart!',
+                text: 'The product has been added to your cart.',
+                confirmButtonText: 'OK'
+            });
+        },
+        error: function(xhr, errmsg, err){
+            console.error("Error:", xhr.status, xhr.responseText);
+            Swal.fire({
+                icon: 'error',
+                title: 'Error!',
+                text: 'There was a problem adding the product to your cart.',
+                confirmButtonText: 'OK'
+            });
+        }
+    });
+});
+</script>
+{% endblock content %}

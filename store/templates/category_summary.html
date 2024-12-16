@@ -1,0 +1,28 @@
+<!-- category_summary.html -->
+{% extends "base.html" %}
+{% block content %}
+<header class="bg-dark py-5">
+    <div class="container px-4 px-lg-5 my-5">
+        <div class="text-center text-white">
+            <h1 class="display-4 fw-bolder">Categories</h1>
+            <p class="lead fw-normal text-white-50 mb-0">Explore our categories</p>
+        </div>
+    </div>
+</header>
+
+<div class="container" style="max-width: 600px; padding: 10px;">
+    {% if categories %}
+        <ul class="list-group">
+            {% for category in categories %}
+                <li class="list-group-item">
+                    <h5>{{ category.name }}</h5>
+                    <p>{{ category.description }}</p>
+                    <a href="{% url 'category_detail' category.id %}" class="btn btn-info btn-sm">View Products</a>
+                </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p>No categories available at the moment.</p>
+    {% endif %}
+</div>
+{% endblock %}

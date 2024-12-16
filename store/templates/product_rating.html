@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+
+{% block content %}
+<p> <a href="{% url 'home' %}">Back</a></p>
+<div class="product-page">
+    <h1>Rate {{ product.name }}</h1>
+
+    <div class="product-details">
+        <img src="{{ product.image.url }}" alt="{{ product.name }}" class="product-image">
+        <p>{{ product.description }}</p>
+        <p>Price: ${{ product.get_price }}</p>
+        <p>Average Rating: {{ avg_rating|floatformat:1 }}/5</p>
+    </div>
+
+    <div class="user-rating">
+        <h5>Your Rating</h5>
+        {% if user_rating %}
+            <p>You rated this product {{ user_rating.rating }}/5</p>
+        {% else %}
+            <p>You have not rated this product yet.</p>
+        {% endif %}
+    </div>
+
+    <h4>Rate This Product</h4>
+    <!-- Rating Stars Section -->
+    <form method="post" action="">
+        {% csrf_token %}
+        <div class="rating-stars">
+            {% for i in star_range %}
+                <input type="radio" id="star{{ i }}" name="rating" value="{{ i }}" {% if user_rating and user_rating.rating == i %}checked{% endif %} />
+                <label for="star{{ i }}" title="{{ i }} stars">&#9733;</label>
+            {% endfor %}
+        </div>
+        <button type="submit">Submit Rating</button>
+    </form>
+
+    <h3>All Ratings</h3>
+    <div class="ratings-list">
+        {% if ratings %}
+            <ul>
+                {% for rating in ratings %}
+                    <li>
+                        <div class="star-rating">
+                            {% for i in star_range %}
+                                <span class="{% if i <= rating.rating %}filled{% else %}empty{% endif %}">&#9733;</span>
+                            {% endfor %}
+                        </div>
+                    </li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <p>No ratings yet for this product.</p>
+        {% endif %}
+    </div>
+</div>
+
+<style>
+    .product-page {
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 20px;
+        text-align: center;
+    }
+
+    .product-details, .user-rating, .ratings-list {
+        margin-bottom: 20px;
+    }
+
+    .product-image {
+        max-width: 300px;
+        height: auto;
+        display: block;
+        margin: 0 auto;
+    }
+
+    .rating-stars {
+        display: flex;
+        justify-content: center;
+        gap: 5px;
+        margin-top: 10px;
+    }
+
+    .rating-stars input[type="radio"] {
+        display: none;
+    }
+
+    .rating-stars label {
+        font-size: 30px;
+        color: #d3d3d3;
+        cursor: pointer;
+    }
+
+    .rating-stars input[type="radio"]:checked ~ label,
+    .rating-stars input[type="radio"]:checked ~ label:nth-child(-n+{{ user_rating.rating }}) {
+        color: #ffcc00;
+    }
+
+    .ratings-list ul {
+        list-style-type: none;
+        padding: 0;
+    }
+
+    .ratings-list li {
+        padding: 5px 0;
+        font-size: 1.1rem;
+    }
+
+    .star-rating span {
+        font-size: 20px;
+        color: #d3d3d3;
+    }
+
+    .star-rating .filled {
+        color: #ffcc00;
+    }
+
+    .star-rating .empty {
+        color: #d3d3d3;
+    }
+</style>
+{% endblock %}

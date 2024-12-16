@@ -1,0 +1,242 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block content %}
+<style>
+    .form-field {
+        margin-bottom: 15px; /* Adds space between each input field */
+    }
+
+    /* Optional: Styling for the form and container */
+    #form-wrapper {
+        background-color: #fff;
+        padding: 20px;
+        border-radius: 5px;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+
+    .box-element {
+        margin-bottom: 20px;
+    }
+
+    .form-control {
+        width: 100%;
+        padding: 10px;
+        border: 1px solid #ccc;
+        border-radius: 5px;
+    }
+
+    /* Button styles */
+    .btn {
+        padding: 10px 15px;
+        background-color: #007bff;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+    }
+
+    .btn:hover {
+        background-color: #0056b3;
+    }
+
+    hr {
+        margin: 10px 0;
+    }
+
+    .hidden {
+        display: none;
+    }
+
+    /* Style for payment info section */
+    #payment-info {
+        display: flex; 
+        justify-content: space-between; /* Aligns children to the edges */
+        align-items: center; /* Centers items vertically */
+    }
+
+    #paypal-button-container {
+        margin-left: auto; /* Pushes the PayPal button to the right */
+    }
+</style>
+
+<div class="row">
+    <div class="col-lg-6">
+        <div class="box-element" id="form-wrapper">
+            <form id="form">
+                {% csrf_token %}
+
+                {% if not user.is_authenticated %}
+                <div id="user-info">
+                    <div class="form-field">
+                        <input required class="form-control" type="text" name="name" placeholder="Name..">
+                    </div>
+                    <div class="form-field">
+                        <input required class="form-control" type="email" name="email" placeholder="Email.." pattern="[^@]+@[^@]+\.[a-zA-Z]{2,}">
+                    </div>
+                </div>
+                {% endif %}
+
+                {% if not digital_order %}
+                <div id="shipping-info">
+                    <hr>
+                    <p>Shipping Information:</p>
+                    <hr>
+                    <div class="form-field">
+                        <input class="form-control" type="text" name="address" placeholder="Address.." required>
+                    </div>
+                    <div class="form-field">
+                        <input class="form-control" type="text" name="city" placeholder="City.." required>
+                    </div>
+                    <div class="form-field">
+                        <input class="form-control" type="text" name="state" placeholder="State.." required>
+                    </div>
+                    <div class="form-field">
+                        <input class="form-control" type="text" name="zipcode" placeholder="Zip code.." required>
+                    </div>
+                    <div class="form-field">
+                        <input class="form-control" type="text" name="country" placeholder="Country.." required>
+                    </div>
+                </div>
+                {% endif %}
+
+                <hr>
+            </form>
+        </div>
+
+        <br>
+        <div class="box-element hidden" id="payment-info">
+            <small></small>
+            <div id="paypal-button-container"></div>
+        </div>
+    </div>
+
+    <div class="col-lg-6">
+        <div class="box-element">
+            <a class="btn btn-outline-dark" href="{% url 'cart_summary' %}">&#x2190; Back to Cart</a>
+            <hr>
+            <h3>Order Summary</h3>
+            <hr>
+            <ul>
+                {% for item in items %}
+                    <li>{{ item.product.name }} (x{{ item.quantity }}) - ${{ item.product.get_price }}</li>
+                {% endfor %}
+            </ul>
+            <strong>Total: ${{ total }}</strong>
+        </div>
+    </div>
+</div>
+
+<script src="https://www.paypal.com/sdk/js?client-id=AZaUQCjjoZL7nErqmXH_Lm6ABDOFBEYchTSMJai2PM75KuTMPeWcsBDFqiUyc9igjDoQWotmd_fBAveP&currency=USD"></script>
+
+<script>
+    var Shipping = '{{ order.shipping }}' === 'True';
+    var user = '{{ user|default:"AnonymousUser" }}';
+    var digitalOrder = '{{ digital_order }}' === 'True';
+
+    document.addEventListener("DOMContentLoaded", function() {
+        if (digitalOrder) {
+            document.getElementById('shipping-info').style.display = 'none';
+        }
+
+        if (user !== 'AnonymousUser') {
+            document.getElementById('user-info').style.display = 'none';
+        }
+
+        if (digitalOrder && user !== 'AnonymousUser') {
+            document.getElementById('form-wrapper').classList.add("hidden");
+            document.getElementById('payment-info').classList.remove("hidden");
+        }
+    });
+
+    var form = document.getElementById('form');
+    var csrftoken = form.getElementsByTagName("input")[0].value;
+
+    form.addEventListener('submit', function(e){
+        e.preventDefault();
+        // Basic form validation before showing payment
+        var emptyFields = Array.from(form.querySelectorAll('input')).some(input => input.value === '');
+        if (emptyFields) {
+            alert('Please fill out all required fields.');
+            return;
+        }
+        document.getElementById('payment-info').classList.remove("hidden");
+    });
+
+    paypal.Buttons({
+        style: {
+            color: 'blue',
+            shape: 'rect',
+        },
+        createOrder: function(data, actions) {
+            return actions.order.create({
+                purchase_units: [{
+                    amount: {
+                        value: '{{ total|floatformat:2 }}'  // Ensure total is formatted correctly
+                    }
+                }]
+            });
+        },
+        onApprove: function(data, actions) {
+            return actions.order.capture().then(function(details) {
+                alert('Transaction completed' );
+                submitFormData();  // Call your submit function
+            });
+        },
+        onError: function (err) {
+            alert('There was an error with the transaction. Please log in to complete.');
+        }
+    }).render('#paypal-button-container');
+
+    function submitFormData(){
+        var userFormData = {
+            'name': null,
+            'email': null,
+            'total': '{{ total|floatformat:2 }}'
+        };
+
+        var shippingInfo = {
+            'address': null,
+            'city': null,
+            'state': null,
+            'zipcode': null,
+            'country': null
+        };
+
+        if (user === 'AnonymousUser') {
+            userFormData.name = form.name.value;
+            userFormData.email = form.email.value;
+        }
+
+        if (Shipping) {
+            shippingInfo.address = form.address.value;
+            shippingInfo.city = form.city.value;
+            shippingInfo.state = form.state.value;
+            shippingInfo.zipcode = form.zipcode.value;
+            shippingInfo.country = form.country.value;
+        }
+
+        var url = '/process_order/';  // Adjust as necessary
+        fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrftoken,
+            },
+            body: JSON.stringify({'form': userFormData, 'shipping': shippingInfo})
+        })
+        .then((response) => response.json())
+        .then((data) => {
+            alert('Transaction completed');
+            // Clear cart by resetting the cookie
+            document.cookie = 'cart=' + JSON.stringify({}) + ";domain=;path=/";
+            // Redirect to home after the cart is cleared
+            window.location.href = "{% url 'home' %}";
+        })
+        .catch((error) => {
+            alert('There was an error processing your order. Please log in to complete.');
+        });
+    }
+</script>
+
+{% endblock %}
