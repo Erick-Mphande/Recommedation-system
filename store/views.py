@@ -3,7 +3,7 @@ from datetime import timezone
 import json
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
-from django.db.models import F
+from django.db.models import F, Avg, Count, Q
 from cart import models
 from cart.cart import Cart
 from .models import Category, Customer, Order, Product, Rating, ShippingAddress, UserInteraction
@@ -18,13 +18,9 @@ from django.views import View
 from django.urls import reverse_lazy
 from uuid import uuid4
 from django.views.decorators.http import require_POST
-from django.db.models import Avg, Count, Q
-from django.db.models import Avg
-from django.db.models import Count
 from collections import defaultdict
 import numpy as np
 from scipy.spatial.distance import cosine
-from .models import Product, Rating, ViewingHistory, OrderItem
 from django.views.decorators.csrf import csrf_exempt
 from django.conf import settings
 import os
@@ -63,16 +59,14 @@ except OSError as e:
 def clear_cart(request):
     if request.method == "POST":
         try:
-            cart = request.user.cart  # Assuming the user has a `cart` attribute or a `get_cart()` method
-            cart_items = cart.cartitem_set.all()  # Adjust if your cart items are accessed differently
+            cart = request.user.cart
+            cart_items = cart.cartitem_set.all()
             
-            # Update product quantities (if your cart logic deducts from available stock)
             for item in cart_items:
                 product = item.product
                 product.stock += item.quantity
                 product.save()
 
-            # Clear the cart
             cart.cartitem_set.all().delete()
 
             return JsonResponse({"success": True, "message": "Cart cleared successfully!"})
@@ -104,11 +98,9 @@ def product_detail(request, pk):
     product = get_object_or_404(Product, id=pk)
     recommendations = Product.objects.filter(category=product.category).exclude(id=product.id)[:5]
 
-    # Calculate the average rating
     avg_rating = product.reviews.aggregate(Avg('rating'))['rating__avg'] or 0
     reviews = product.reviews.all()
 
-    # Render the product details and recommendations to the template
     return render(request, 'product_detail.html', {
         'product': product,
         'recommendations': recommendations,
@@ -116,59 +108,47 @@ def product_detail(request, pk):
         'reviews': reviews,
     })
 
-
-
-
-# Category and Product Views
 def category_summary(request):
-    categories = Category.objects.all()  # Retrieve all categories from the database
+    categories = Category.objects.all()
     return render(request, 'category_summary.html', {'categories': categories})
 
 def category_detail(request, category_id):
     try:
-        category = Category.objects.get(id=category_id)  # Fetch the category by ID
-        products = Product.objects.filter(category=category)  # Get all products in that category
+        category = Category.objects.get(id=category_id)
+        products = Product.objects.filter(category=category)
         return render(request, 'category_detail.html', {'category': category, 'products': products})
     except Category.DoesNotExist:
         messages.error(request, "That category does not exist.")
-        return redirect('home')  # Redirect to the home page if the category doesn't exist
+        return redirect('home')
 
-# View to display products based on category name (slug or formatted name)
 def category(request, foo):
-    foo = foo.replace('-', ' ')  # Replace hyphens with spaces in the category name (if slug format)
+    foo = foo.replace('-', ' ')
 
     try:
-        category = Category.objects.get(name__iexact=foo)  # Fetch category by name, case insensitive
-        products = Product.objects.filter(category=category)  # Get products belonging to this category
+        category = Category.objects.get(name__iexact=foo)
+        products = Product.objects.filter(category=category)
         return render(request, 'category.html', {'category': category, 'products': products})
     except Category.DoesNotExist:
         messages.error(request, "That Category does not exist.")
         return redirect('home')
 
-
 def product(request, pk):
     product = get_object_or_404(Product, id=pk)
 
-    # Store viewing history if the user is authenticated
     if request.user.is_authenticated:
-        # Log user interaction: viewing a product
         UserInteraction.objects.create(
             user=request.user,
             product=product,
             action='view',
-            #timestamp=timezone.now()  # Correct usage of timezone.now()
         )
 
-    # Fetch recommendations (for example, based on a model or logic)
     recommendations = get_product_recommendations(product)
 
     return render(request, 'product_detail.html', {
         'product': product,
-        'recommendations': recommendations,  # Pass recommendations to the template
+        'recommendations': recommendations,
     })
 
-
-# User Authentication Views
 def login_user(request):
     if request.method == "POST":
         username = request.POST.get('username')
@@ -185,12 +165,10 @@ def login_user(request):
 
     return render(request, 'login.html')
 
-
 def logout_user(request):
     logout(request)
     messages.info(request, "You have been logged out.")
     return redirect('home')
-
 
 def register_user(request):
     if request.method == "POST":
@@ -211,7 +189,7 @@ def register_user(request):
 class UserProfileUpdateView(View):
     def get(self, request):
         form = UserProfileForm(instance=request.user)
-        return render(request, 'Update_profile.html', {'form': form})
+        return render(request, 'update_profile.html', {'form': form})
 
     def post(self, request):
         form = UserProfileForm(request.POST, instance=request.user)
@@ -219,10 +197,8 @@ class UserProfileUpdateView(View):
             form.save()
             messages.success(request, "Profile updated successfully!")
             return redirect('profile_update')
-        return render(request, 'Update_profile.html', {'form': form})
+        return render(request, 'update_profile.html', {'form': form})
 
-
-# Checkout and Order Processing
 def checkout(request):
     items = request.session.get('cart', {})
     order_items = []
@@ -237,8 +213,6 @@ def checkout(request):
     context = {'items': order_items, 'total': total, 'user': request.user, 'digital_order': False}
     return render(request, 'checkout.html', context)
 
-
-# Guest-friendly order processing
 def process_order(request):
     if request.method == 'POST':
         try:
@@ -250,7 +224,8 @@ def process_order(request):
             if not cart:
                 return JsonResponse({'error': 'Cart is empty'}, status=400)
 
-            order = Order.objects.get_or_create(user=request.user if request.user.is_authenticated else None, complete=False)[0]
+            order, created = Order.objects.get_or_create(user=request.user if request.user.is_authenticated else None, complete=False)
+
             total_amount = sum(Product.objects.get(id=item_id).price * int(quantity) for item_id, quantity in cart.items())
             
             if float(total) != total_amount:
@@ -279,20 +254,13 @@ def process_order(request):
 
     return JsonResponse({'error': 'Invalid request method'}, status=405)
 
-
-
-@require_POST
 def rate_product(request, product_id):
     product = get_object_or_404(Product, id=product_id)
     rating_value = int(request.POST.get('rating', 0))
 
     if 1 <= rating_value <= 5:
-        # Save or update the rating
         Rating.objects.update_or_create(user=request.user, product=product, defaults={'rating': rating_value})
-        
-        # Log the rating interaction
         UserInteraction.objects.create(user=request.user, product=product, action='rate', timestamp=timezone.now())
-
         return JsonResponse({'status': 'success', 'message': 'Rating submitted successfully.'})
     return JsonResponse({'status': 'error', 'message': 'Invalid rating value.'})
 
@@ -301,18 +269,15 @@ def product_rating(request, product_id):
     ratings = Rating.objects.filter(product=product)
     avg_rating = ratings.aggregate(Avg('rating'))['rating__avg']
     user_rating = None
-    
-    # Check if the user is authenticated before accessing their rating
+
     if request.user.is_authenticated:
         user_rating = ratings.filter(user=request.user).first()
     else:
-        # Redirect to login if the user is not authenticated
         return redirect('login')
 
     star_range = [1, 2, 3, 4, 5]
 
     if request.method == 'POST':
-        # Ensure the user is authenticated before saving a rating
         if request.user.is_authenticated:
             rating_value = request.POST.get('rating')
             if rating_value:
@@ -334,6 +299,7 @@ def product_rating(request, product_id):
     }
 
     return render(request, 'product_rating.html', context)
+
 
 
 
