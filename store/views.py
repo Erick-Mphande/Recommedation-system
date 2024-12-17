@@ -4,9 +4,6 @@ import json
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.db.models import F
-
-
-
 from cart import models
 from cart.cart import Cart
 from .models import Category, Customer, Order, Product, Rating, ShippingAddress, UserInteraction
@@ -28,24 +25,38 @@ from collections import defaultdict
 import numpy as np
 from scipy.spatial.distance import cosine
 from .models import Product, Rating, ViewingHistory, OrderItem
-# ikom/views.py
-
-from django.shortcuts import render
 from django.views.decorators.csrf import csrf_exempt
 from django.conf import settings
 import os
 import tensorflow as tf
+import requests
 
-from store import recommendations  # or `from tensorflow.keras.models import load_model`
-# Or, if using a scikit-learn model:
-# import joblib
+# Dynamically construct the model path
+model_path = os.path.join(settings.BASE_DIR, 'store', 'recommendations', 'models', 'ncf_model.h5')
 
-# Load the model (assuming TensorFlow/Keras here)
-model_path = os.path.join(settings.BASE_DIR, r'C:\Users\27728\Desktop\IKOMPRJ\store\recommendations\models\ncf_model.h5')
-model = tf.keras.models.load_model(model_path)
-# Or, if using Scikit-learn:
-# model_path = os.path.join(settings.BASE_DIR, 'ikom/models/your_saved_model.pkl')
-# model = joblib.load(model_path)
+# Ensure the model file exists or download it if missing
+if not os.path.exists(model_path):
+    print(f"Model file not found at {model_path}. Attempting to download...")
+    MODEL_URL = "https://github.com/Erick-Mphande/Recommedation-system/raw/main/store/recommendations/models/ncf_model.h5"
+    try:
+        response = requests.get(MODEL_URL, stream=True)
+        if response.status_code == 200:
+            os.makedirs(os.path.dirname(model_path), exist_ok=True)
+            with open(model_path, 'wb') as f:
+                for chunk in response.iter_content(chunk_size=8192):
+                    f.write(chunk)
+            print("Model downloaded successfully!")
+        else:
+            raise Exception(f"Failed to download model. HTTP Status: {response.status_code}")
+    except Exception as e:
+        raise FileNotFoundError(f"Unable to load the model. {str(e)}")
+
+# Load the TensorFlow/Keras model
+try:
+    model = tf.keras.models.load_model(model_path)
+    print("Model loaded successfully!")
+except OSError as e:
+    raise OSError(f"Error loading model from {model_path}: {e}")
 
 @login_required
 @csrf_exempt
@@ -69,7 +80,6 @@ def clear_cart(request):
             return JsonResponse({"success": False, "message": str(e)})
     return JsonResponse({"success": False, "message": "Invalid request method."})
 
-
 def product_list(request):
     products = Product.objects.annotate(avg_rating=Avg('rating__rating')).all()
     popular_products = Product.objects.order_by('-view_count')[:5]
@@ -78,7 +88,6 @@ def product_list(request):
         'popular_products': popular_products,
     }
     return render(request, 'home.html', context)
-
 
 # Helper function to generate transaction ID
 def generate_transaction_id():
@@ -106,6 +115,7 @@ def product_detail(request, pk):
         'avg_rating': round(avg_rating, 2),
         'reviews': reviews,
     })
+
 
 
 
