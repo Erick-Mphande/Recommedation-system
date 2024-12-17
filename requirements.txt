@@ -36,9 +36,7 @@ Markdown==3.7
 markdown-it-py==3.0.0
 MarkupSafe==3.0.2
 mdurl==0.1.2
-ml-dtypes==0.4.1
 namex==0.0.8
-numpy==1.26.4
 oauthlib==3.2.2
 opt_einsum==3.4.0
 optree==0.13.1
@@ -60,7 +58,6 @@ scipy==1.14.1
 six==1.16.0
 SQLAlchemy==2.0.36
 sqlparse==0.5.1
-tensorboard==2.11.2
 tensorboard-data-server==0.6.1
 tensorboard-plugin-wit==1.8.1
 tensorflow
