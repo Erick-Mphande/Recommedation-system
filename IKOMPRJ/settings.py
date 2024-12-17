@@ -27,7 +27,7 @@ SECRET_KEY = 'django-insecure-4e+r^il-xwh2eezgk@q4iyv_89%iaj+r)#p3h_@asifsvzcnf7
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['quickcart-cf14.onrender.com', '127.0.0.1', 'localhost']
 
 
 # Application definition
@@ -140,4 +140,7 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # PayPal credentials
 PAYPAL_CLIENT_ID = 'AQsB076160kExgpK1OE00c8boq0v8JwKydp13lJa8YeRPBVKoIyJjD3MwqHvsgIJiYA0LCUoSjMoT5Rr'
 PAYPAL_CLIENT_SECRET = 'EHExBv4sTFXj1EmNudxQQJhzeSUOTLsgmx-XsRgQ9qvwx3SomzWtHYXBeQBXc9rc3A8rrqlqPqf_LakG'
+
+
+
 
