@@ -37,5 +37,5 @@ pytz==2024.2
 requests==2.32.3
 scikit-learn==1.5.2
 six==1.16.0
-tensorflow-cpu==2.13.0  
+tensorflow
 gunicorn==20.1.0
