@@ -4,9 +4,6 @@ import json
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.db.models import F
-
-
-
 from cart import models
 from cart.cart import Cart
 from .models import Category, Customer, Order, Product, Rating, ShippingAddress, UserInteraction
@@ -22,30 +19,25 @@ from django.urls import reverse_lazy
 from uuid import uuid4
 from django.views.decorators.http import require_POST
 from django.db.models import Avg, Count, Q
-from django.db.models import Avg
-from django.db.models import Count
 from collections import defaultdict
 import numpy as np
 from scipy.spatial.distance import cosine
-from .models import Product, Rating, ViewingHistory, OrderItem
-# ikom/views.py
-
-from django.shortcuts import render
 from django.views.decorators.csrf import csrf_exempt
 from django.conf import settings
 import os
 import tensorflow as tf
 
-from store import recommendations  # or `from tensorflow.keras.models import load_model`
-# Or, if using a scikit-learn model:
-# import joblib
-
-# Load the model (assuming TensorFlow/Keras here)
-model_path = os.path.join(settings.BASE_DIR, r'C:\Users\27728\Desktop\IKOMPRJ\store\recommendations\models\ncf_model.h5')
-model = tf.keras.models.load_model(model_path)
-# Or, if using Scikit-learn:
-# model_path = os.path.join(settings.BASE_DIR, 'ikom/models/your_saved_model.pkl')
-# model = joblib.load(model_path)
+# Load the model dynamically with error handling
+try:
+    model_path = os.path.join(settings.BASE_DIR, 'store/recommendations/models/ncf_model.h5')
+    if os.path.exists(model_path):
+        model = tf.keras.models.load_model(model_path)
+    else:
+        model = None
+        print(f"Model file not found at: {model_path}")
+except Exception as e:
+    model = None
+    print(f"Error loading model: {e}")
 
 @login_required
 @csrf_exempt
