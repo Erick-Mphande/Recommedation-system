@@ -3,7 +3,10 @@ from datetime import timezone
 import json
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
-from django.db.models import F, Avg, Count, Q
+from django.db.models import F
+
+
+
 from cart import models
 from cart.cart import Cart
 from .models import Category, Customer, Order, Product, Rating, ShippingAddress, UserInteraction
@@ -18,61 +21,54 @@ from django.views import View
 from django.urls import reverse_lazy
 from uuid import uuid4
 from django.views.decorators.http import require_POST
+from django.db.models import Avg, Count, Q
+from django.db.models import Avg
+from django.db.models import Count
 from collections import defaultdict
 import numpy as np
 from scipy.spatial.distance import cosine
+from .models import Product, Rating, ViewingHistory, OrderItem
+# ikom/views.py
+
+from django.shortcuts import render
 from django.views.decorators.csrf import csrf_exempt
 from django.conf import settings
 import os
 import tensorflow as tf
-import requests
 
-# Dynamically construct the model path
-model_path = os.path.join(settings.BASE_DIR, 'store', 'recommendations', 'models', 'ncf_model.h5')
+from store import recommendations  # or `from tensorflow.keras.models import load_model`
+# Or, if using a scikit-learn model:
+# import joblib
 
-# Ensure the model file exists or download it if missing
-if not os.path.exists(model_path):
-    print(f"Model file not found at {model_path}. Attempting to download...")
-    MODEL_URL = "https://github.com/Erick-Mphande/Recommedation-system/raw/main/store/recommendations/models/ncf_model.h5"
-    try:
-        response = requests.get(MODEL_URL, stream=True)
-        if response.status_code == 200:
-            os.makedirs(os.path.dirname(model_path), exist_ok=True)
-            with open(model_path, 'wb') as f:
-                for chunk in response.iter_content(chunk_size=8192):
-                    f.write(chunk)
-            print("Model downloaded successfully!")
-        else:
-            raise Exception(f"Failed to download model. HTTP Status: {response.status_code}")
-    except Exception as e:
-        raise FileNotFoundError(f"Unable to load the model. {str(e)}")
-
-# Load the TensorFlow/Keras model
-try:
-    model = tf.keras.models.load_model(model_path)
-    print("Model loaded successfully!")
-except OSError as e:
-    raise OSError(f"Error loading model from {model_path}: {e}")
+# Load the model (assuming TensorFlow/Keras here)
+model_path = os.path.join(settings.BASE_DIR, r'C:\Users\27728\Desktop\IKOMPRJ\store\recommendations\models\ncf_model.h5')
+model = tf.keras.models.load_model(model_path)
+# Or, if using Scikit-learn:
+# model_path = os.path.join(settings.BASE_DIR, 'ikom/models/your_saved_model.pkl')
+# model = joblib.load(model_path)
 
 @login_required
 @csrf_exempt
 def clear_cart(request):
     if request.method == "POST":
         try:
-            cart = request.user.cart
-            cart_items = cart.cartitem_set.all()
+            cart = request.user.cart  # Assuming the user has a `cart` attribute or a `get_cart()` method
+            cart_items = cart.cartitem_set.all()  # Adjust if your cart items are accessed differently
             
+            # Update product quantities (if your cart logic deducts from available stock)
             for item in cart_items:
                 product = item.product
                 product.stock += item.quantity
                 product.save()
 
+            # Clear the cart
             cart.cartitem_set.all().delete()
 
             return JsonResponse({"success": True, "message": "Cart cleared successfully!"})
         except Exception as e:
             return JsonResponse({"success": False, "message": str(e)})
     return JsonResponse({"success": False, "message": "Invalid request method."})
+
 
 def product_list(request):
     products = Product.objects.annotate(avg_rating=Avg('rating__rating')).all()
@@ -82,6 +78,7 @@ def product_list(request):
         'popular_products': popular_products,
     }
     return render(request, 'home.html', context)
+
 
 # Helper function to generate transaction ID
 def generate_transaction_id():
@@ -98,9 +95,11 @@ def product_detail(request, pk):
     product = get_object_or_404(Product, id=pk)
     recommendations = Product.objects.filter(category=product.category).exclude(id=product.id)[:5]
 
+    # Calculate the average rating
     avg_rating = product.reviews.aggregate(Avg('rating'))['rating__avg'] or 0
     reviews = product.reviews.all()
 
+    # Render the product details and recommendations to the template
     return render(request, 'product_detail.html', {
         'product': product,
         'recommendations': recommendations,
@@ -108,47 +107,58 @@ def product_detail(request, pk):
         'reviews': reviews,
     })
 
+
+
+# Category and Product Views
 def category_summary(request):
-    categories = Category.objects.all()
+    categories = Category.objects.all()  # Retrieve all categories from the database
     return render(request, 'category_summary.html', {'categories': categories})
 
 def category_detail(request, category_id):
     try:
-        category = Category.objects.get(id=category_id)
-        products = Product.objects.filter(category=category)
+        category = Category.objects.get(id=category_id)  # Fetch the category by ID
+        products = Product.objects.filter(category=category)  # Get all products in that category
         return render(request, 'category_detail.html', {'category': category, 'products': products})
     except Category.DoesNotExist:
         messages.error(request, "That category does not exist.")
-        return redirect('home')
+        return redirect('home')  # Redirect to the home page if the category doesn't exist
 
+# View to display products based on category name (slug or formatted name)
 def category(request, foo):
-    foo = foo.replace('-', ' ')
+    foo = foo.replace('-', ' ')  # Replace hyphens with spaces in the category name (if slug format)
 
     try:
-        category = Category.objects.get(name__iexact=foo)
-        products = Product.objects.filter(category=category)
+        category = Category.objects.get(name__iexact=foo)  # Fetch category by name, case insensitive
+        products = Product.objects.filter(category=category)  # Get products belonging to this category
         return render(request, 'category.html', {'category': category, 'products': products})
     except Category.DoesNotExist:
         messages.error(request, "That Category does not exist.")
         return redirect('home')
 
+
 def product(request, pk):
     product = get_object_or_404(Product, id=pk)
 
+    # Store viewing history if the user is authenticated
     if request.user.is_authenticated:
+        # Log user interaction: viewing a product
         UserInteraction.objects.create(
             user=request.user,
             product=product,
             action='view',
+            #timestamp=timezone.now()  # Correct usage of timezone.now()
         )
 
+    # Fetch recommendations (for example, based on a model or logic)
     recommendations = get_product_recommendations(product)
 
     return render(request, 'product_detail.html', {
         'product': product,
-        'recommendations': recommendations,
+        'recommendations': recommendations,  # Pass recommendations to the template
     })
 
+
+# User Authentication Views
 def login_user(request):
     if request.method == "POST":
         username = request.POST.get('username')
@@ -165,10 +175,12 @@ def login_user(request):
 
     return render(request, 'login.html')
 
+
 def logout_user(request):
     logout(request)
     messages.info(request, "You have been logged out.")
     return redirect('home')
+
 
 def register_user(request):
     if request.method == "POST":
@@ -189,7 +201,7 @@ def register_user(request):
 class UserProfileUpdateView(View):
     def get(self, request):
         form = UserProfileForm(instance=request.user)
-        return render(request, 'update_profile.html', {'form': form})
+        return render(request, 'Update_profile.html', {'form': form})
 
     def post(self, request):
         form = UserProfileForm(request.POST, instance=request.user)
@@ -197,8 +209,10 @@ class UserProfileUpdateView(View):
             form.save()
             messages.success(request, "Profile updated successfully!")
             return redirect('profile_update')
-        return render(request, 'update_profile.html', {'form': form})
+        return render(request, 'Update_profile.html', {'form': form})
 
+
+# Checkout and Order Processing
 def checkout(request):
     items = request.session.get('cart', {})
     order_items = []
@@ -213,6 +227,8 @@ def checkout(request):
     context = {'items': order_items, 'total': total, 'user': request.user, 'digital_order': False}
     return render(request, 'checkout.html', context)
 
+
+# Guest-friendly order processing
 def process_order(request):
     if request.method == 'POST':
         try:
@@ -224,8 +240,7 @@ def process_order(request):
             if not cart:
                 return JsonResponse({'error': 'Cart is empty'}, status=400)
 
-            order, created = Order.objects.get_or_create(user=request.user if request.user.is_authenticated else None, complete=False)
-
+            order = Order.objects.get_or_create(user=request.user if request.user.is_authenticated else None, complete=False)[0]
             total_amount = sum(Product.objects.get(id=item_id).price * int(quantity) for item_id, quantity in cart.items())
             
             if float(total) != total_amount:
@@ -254,13 +269,20 @@ def process_order(request):
 
     return JsonResponse({'error': 'Invalid request method'}, status=405)
 
+
+
+@require_POST
 def rate_product(request, product_id):
     product = get_object_or_404(Product, id=product_id)
     rating_value = int(request.POST.get('rating', 0))
 
     if 1 <= rating_value <= 5:
+        # Save or update the rating
         Rating.objects.update_or_create(user=request.user, product=product, defaults={'rating': rating_value})
+        
+        # Log the rating interaction
         UserInteraction.objects.create(user=request.user, product=product, action='rate', timestamp=timezone.now())
+
         return JsonResponse({'status': 'success', 'message': 'Rating submitted successfully.'})
     return JsonResponse({'status': 'error', 'message': 'Invalid rating value.'})
 
@@ -269,15 +291,18 @@ def product_rating(request, product_id):
     ratings = Rating.objects.filter(product=product)
     avg_rating = ratings.aggregate(Avg('rating'))['rating__avg']
     user_rating = None
-
+    
+    # Check if the user is authenticated before accessing their rating
     if request.user.is_authenticated:
         user_rating = ratings.filter(user=request.user).first()
     else:
+        # Redirect to login if the user is not authenticated
         return redirect('login')
 
     star_range = [1, 2, 3, 4, 5]
 
     if request.method == 'POST':
+        # Ensure the user is authenticated before saving a rating
         if request.user.is_authenticated:
             rating_value = request.POST.get('rating')
             if rating_value:
@@ -299,7 +324,6 @@ def product_rating(request, product_id):
     }
 
     return render(request, 'product_rating.html', context)
-
 
 
 
